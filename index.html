@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>Juego del isay: Moneda</title> 
+</head>
+<body>
+
+<canvas id="canvas" width="800" height="600"></canvas> 
+<button type="button" onclick="iniciar()" id="iniciar">Iniciar</button>
+
+<div id="controles">
+    <h1>Tips</h1>
+    <ul><li>Usa las flechas del teclado para mover al personaje</li>
+    <li>Recoge todas las monedas para  ganar!</li></ul>
+</div>
+
+<div id="totalMonedas">
+    <p><strong>Monedas recogidas: <span id="monedasRecogidas">0</span></strong></p>
+</div>
+
+<div>
+    <h1 id="msg">Felicidades!!! <br>Has recogido todas las monedas<br>Estás listo para el siguiente nivel???</h1>
+    <button type="reset" onclick="window.location.reload()" id="reset">Siguiente nivel</button>
+</div>
+
+<style>
+canvas {
+    border: 1px solid black;
+    display: none;
+    background-color: skyblue;
+}
+*{
+    font-family: Helvetica, sans-serif;
+    letter-spacing: 1.2px;
+}
+body{
+    padding: 20px;
+}
+#msg, #reset {
+    display: none;
+}
+button{
+    width: 150px;
+    height: 50px;
+    border: 2px solid rgba(70, 146, 218, 0.822);
+    background-color: rgba(70, 146, 218, 0.589);
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    left: 25%;
+}
+button:hover {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+#totalMonedas{
+    width: 800px;
+    border: 1px solid black;
+    font-size: x-large;
+    text-align: center;
+}
+#controles{
+    padding: 20px;
+}
+</style>
+
+<script>
+function iniciar() {
+    document.getElementById("iniciar").style.display = "none";
+    document.querySelector("canvas").style.display = "block";
+    buclePrincipal();
+}
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let x = 0;
+let y = 200;
+const anchoPj = 20;
+const altoPj = 20;
+const speed = 1.7; 
+let gravedad =1.5; 
+let monedasRecogidas = 0;
+let animacionId;
+
+//plataformas
+const platfrm = [];
+for (let i = 0; i < 20; i++) {
+    const pos = generaPosValid(100, 50, true);
+    platfrm.push({ ...pos, ancho: 100, alto: 50 });
+}
+
+function generaPosValid(ancho, alto, evitarPlatfrms = true) {
+    let pos;
+    let valido;
+    do {
+        valido = true;
+        pos = {
+            x: Math.floor(Math.random() * (canvas.width - ancho)),
+            y: Math.floor(Math.random() * (canvas.height - alto))
+        };
+        if (evitarPlatfrms) {
+            platfrm.forEach(p => {
+                if (
+                    pos.x < p.x + p.ancho &&
+                    pos.x + ancho > p.x &&
+                    pos.y < p.y + p.alto &&
+                    pos.y + alto > p.y
+                ) {
+                    valido = false;
+                }
+            });
+        }
+    } while (!valido);
+    return pos;
+}
+
+//monedas
+const moneda = Array(3).fill().map(() => {
+    const pos = generaPosValid(20, 20, true);
+    return { ...pos, ancho: 20, alto: 20 };
+});
+
+function dibujar() {
+    ctx.beginPath();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "orange";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.9;
+    ctx.shadowColor = "gray";
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetX = 5;
+    ctx.shadowOffsetY = 5;
+    ctx.fillRect(x, y, anchoPj, altoPj);
+    ctx.strokeRect(x, y, anchoPj, altoPj);
+}
+
+function plataformasDib() {
+    let enPlataforma = false;
+
+    platfrm.forEach(p => {
+        ctx.beginPath();
+        ctx.fillStyle = "green";
+        ctx.fillRect(p.x, p.y, p.ancho, p.alto);
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.7
+        ctx.shadowColor = "gray";
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 5;
+        ctx.shadowOffsetY = 5;
+        ctx.strokeRect(p.x, p.y, p.ancho, p.alto);
+
+        // Margen - evitar colisiones en las esquinas
+        const margenX = anchoPj / 2;
+        const margenY = altoPj / 5;
+
+        // Colision arriba
+        if (
+            x + anchoPj - margenX > p.x &&
+            x + margenX < p.x + p.ancho &&
+            y + altoPj >= p.y &&
+            y + altoPj <= p.y + p.alto
+        ) {
+            y = p.y - altoPj;
+            gravedad = 0;
+            enPlataforma = true;
+        }
+
+        // Colision abajo
+        if (
+            x + anchoPj - margenX > p.x &&
+            x + margenX < p.x + p.ancho &&
+            y <= p.y + p.alto &&
+            y >= p.y
+        ) {
+            y = p.y + p.alto;
+            gravedad = 1;
+        }
+
+        // Colision izquierda
+        if (
+            x + anchoPj >= p.x &&
+            x < p.x &&
+            y + altoPj - margenY > p.y &&
+            y + margenY < p.y + p.alto
+        ) {
+            x = p.x - anchoPj;
+        }
+
+        // Colision derecha
+        if (
+            x <= p.x + p.ancho &&
+            x + anchoPj > p.x + p.ancho &&
+            y + altoPj - margenY > p.y &&
+            y + margenY < p.y + p.alto
+        ) {
+            x = p.x + p.ancho;
+        }
+    });
+
+    if (!enPlataforma) {
+        gravedad = 1;
+    }
+}
+
+function gravity() {
+    if (y + altoPj < canvas.height) {
+        y += gravedad;
+    } else if (y + altoPj >= canvas.height) {
+        y = canvas.height - altoPj;
+    }
+}
+
+function mover(event) {
+    switch(event.key) { 
+        case "ArrowUp":     y -= speed * 10; break;
+        case "ArrowDown":   y += speed * 5; break;
+        case "ArrowLeft":   x -= speed * 5; break;
+        case "ArrowRight":  x += speed * 5; break;
+    }
+
+    //limites
+    if (x < 0){ return x = 0};  //left
+    if (y < 0){ return y = 0};  //top
+    if(x + anchoPj > canvas.width){ return x = canvas.width - anchoPj}; //right
+    if(y + altoPj > canvas.height){ return y = canvas.height - altoPj}; //bottom
+
+    //mover plataformas y monedas 
+    if ("ArrowRight" === event.key) { 
+        platfrm.forEach(pltF => { pltF.x -= speed / 2; });
+        moneda.forEach(m => { m.x -= speed / 2; });
+    } else if("ArrowLeft" === event.key) { 
+        platfrm.forEach(pltF => { pltF.x += speed / 2; });
+        moneda.forEach(m => { m.x += speed / 2; });
+    }
+}
+
+function recogerMoneda() {
+    moneda.forEach((m, i) => {
+
+        ctx.beginPath();
+        ctx.arc(m.x + m.ancho / 2, m.y + m.alto / 2, m.ancho / 2, 0, 2 * Math.PI);
+        ctx.fillStyle = "gold";
+        ctx.fill();
+        ctx.strokeStyle = "yellow";
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.9;
+        ctx.shadowColor = "gold";
+        ctx.shadowBlur = 10;
+		ctx.shadowOffsetX = 5;
+		ctx.shadowOffsetY = 5;
+        ctx.stroke();
+
+        if (x < m.x + m.ancho && x + anchoPj > m.x && y < m.y + m.alto && y + altoPj > m.y) {
+            moneda.splice(i, 1);
+            monedasRecogidas++;
+            document.getElementById("monedasRecogidas").innerText = monedasRecogidas;
+        }
+
+        if (monedasRecogidas === 3) {
+            document.getElementById("msg").style.display = "block";
+            document.getElementById("reset").style.display = "block";
+            document.getElementById("controles").style.display = "none";
+            document.getElementById("totalMonedas").style.display = "none";
+            document.querySelector("canvas").style.display = "none";
+            console.log("se detuvo el bucle");
+            cancelAnimationFrame(animacionId);
+        }
+    })
+}
+
+document.addEventListener("keydown", mover);
+function buclePrincipal() {
+  gravity();
+  dibujar();
+  plataformasDib();
+  recogerMoneda();
+  animacionId = requestAnimationFrame(buclePrincipal);
+}
+</script>
+</body>
+</html>
